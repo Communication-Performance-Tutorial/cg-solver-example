@@ -195,6 +195,49 @@ After `rocblas_ddot`, a single `hipDeviceSynchronize()` makes the result visible
 
 ---
 
+## SDMA engines vs. blit kernels (`HSA_ENABLE_SDMA`)
+
+When GPU-Aware MPI (`isend`, `alltoallv`) passes a GPU pointer to the MPI runtime, UCX must physically move the data out of device memory.
+ROCm gives it two mechanisms to do that:
+
+| Mechanism | `HSA_ENABLE_SDMA` | How it works |
+|---|---|---|
+| **SDMA engines** | `1` (default) | Dedicated hardware DMA controllers transfer data between GPU memory and the fabric.
+They run independently of the shader engines and do not consume compute resources. |
+| **Blit kernels** | `0` | ROCm dispatches a small compute shader (a "blit") to copy the data using the GPU's shader engines.
+No dedicated DMA hardware is used. |
+
+Set the variable before `mpirun` to switch between them:
+
+```bash
+# SDMA engines (default)
+HSA_ENABLE_SDMA=1 mpirun -n 8 --bind-to none bash set_affinity_mi300a.sh ./cg_gpu src/Dubcova2.pm isend
+
+# Blit kernels
+HSA_ENABLE_SDMA=0 mpirun -n 8 --bind-to none bash set_affinity_mi300a.sh ./cg_gpu src/Dubcova2.pm isend
+```
+
+`run_test_7.13.sh` sweeps both values automatically for `isend` and `alltoallv` and labels each run in the log output:
+
+```
+=== isend  HSA_ENABLE_SDMA=1  (sdma) ===
+=== isend  HSA_ENABLE_SDMA=0  (blit_kernel) ===
+=== alltoallv  HSA_ENABLE_SDMA=1  (sdma) ===
+=== alltoallv  HSA_ENABLE_SDMA=0  (blit_kernel) ===
+```
+
+### When does each win?
+
+- **SDMA** tends to win for **large, infrequent transfers** where having the shader engines free to overlap computation matters more
+  than raw copy throughput.
+- **Blit kernels** tend to win for **small, latency-sensitive transfers** where the shader engines are otherwise idle and the lower
+  software overhead of a compute dispatch beats the DMA engine's start-up cost.  On MI300A unified memory, blit kernels often outperform
+  SDMA for the modest ghost-zone message sizes typical of sparse solvers.
+
+The right choice is workload- and hardware-dependent; the sweep in `run_test_7.13.sh` surfaces the difference empirically.
+
+---
+
 ## Requirements
 
 - ROCm ≥ 6.3 (rocSPARSE, rocBLAS, hipcc)
