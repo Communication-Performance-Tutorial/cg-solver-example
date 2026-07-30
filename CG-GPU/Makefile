@@ -25,17 +25,29 @@ INCLUDES = -I$(ROCM_PATH)/include -Isrc $(MPI_CFLAGS)
 LDFLAGS  = -L$(ROCM_PATH)/lib $(MPI_LFLAGS)
 
 # rocSPARSE and rocBLAS for GPU linear algebra; rccl for GPU-native collectives
-LIBS     = -lrocsparse -lrocblas -lrccl
+LIBS          = -lrocsparse -lrocblas -lrccl
+LIBS_ROCSHMEM = -lrocsparse -lrocblas
 
-TARGET   = cg_gpu
-SRC      = src/cg.cpp
+ROCSHMEM_PATH ?= $(HOME)/rocshmem
+ROCSHMEM_INCLUDES = -I$(ROCSHMEM_PATH)/include
+ROCSHMEM_LDFLAGS  = -L$(ROCSHMEM_PATH)/lib
+ROCSHMEM_LIBS     = -lrocshmem -lnuma -lhsa-runtime64 -ldl -pthread
+
+TARGET          = cg_gpu
+SRC             = src/cg.cpp
+TARGET_ROCSHMEM = cg_gpu_rocshmem
+SRC_ROCSHMEM    = src/cg-rocshmem.cpp
 
 .PHONY: all clean run
 
-all: $(TARGET)
+all: $(TARGET) $(TARGET_ROCSHMEM)
 
 $(TARGET): $(SRC)
 	$(HIPCC) $(CXXFLAGS) $(INCLUDES) $< -o $@ $(LDFLAGS) $(LIBS)
+
+$(TARGET_ROCSHMEM): $(SRC_ROCSHMEM)
+	$(HIPCC) $(CXXFLAGS) -fgpu-rdc $(INCLUDES) $(ROCSHMEM_INCLUDES) \
+		$< -o $@ $(LDFLAGS) $(ROCSHMEM_LDFLAGS) $(LIBS_ROCSHMEM) $(ROCSHMEM_LIBS) $(MPI_LFLAGS)
 
 # Quick sanity run: 4 ranks, all four methods
 run: $(TARGET)
@@ -45,4 +57,4 @@ run: $(TARGET)
 	mpirun -n 4 ./$(TARGET) src/Dubcova2.pm rccl
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) $(TARGET_ROCSHMEM)

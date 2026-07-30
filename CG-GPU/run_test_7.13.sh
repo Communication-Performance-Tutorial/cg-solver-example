@@ -5,20 +5,21 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:8
 #SBATCH --time=00:10:00
-#SBATCH --output=/shared/prerelease/home/amd_int/slockhar/CommTutorial/CG-Tutorial/CG-GPU/cg_6.4.3_test_%j.log
+#SBATCH --output=cg_6.4.3_test_%j.log
 
 source /etc/profile 2>/dev/null
 source ~/.bashrc 2>/dev/null
 module load rocm/6.4.3 openmpi/5.0.10-ucc1.6.0-ucx1.19.1-xpmem-2.7.4
 
-cd /shared/prerelease/home/amd_int/slockhar/CommTutorial/CG-Tutorial/CG-GPU
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}"
 
 make clean && make
 
 # --bind-to none: let set_affinity_mi300a.sh own all CPU and GPU pinning.
 # The affinity script sets ROCR_VISIBLE_DEVICES=local_rank (one GPU per rank)
 # and pins each rank to the CPU cores sharing the same memory domain.
-AFFINITY="/shared/prerelease/home/amd_int/slockhar/CommTutorial/CG-Tutorial/CG-GPU/set_affinity_mi300a.sh"
+AFFINITY="${SCRIPT_DIR}/set_affinity_mi300a.sh"
 MPIRUN="mpirun -n 8 --bind-to none bash ${AFFINITY}"
 
 # Non-GPU-aware methods: no dependency on the SDMA vs blit-kernel path
