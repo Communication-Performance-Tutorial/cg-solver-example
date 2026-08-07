@@ -258,9 +258,27 @@ pprof            # text summary: per-call MPI + ROCm/HSA time, merged across ran
 ```bash
 sbatch run_tau.sh                              # profile 4 ranks, method=rccl
 METHOD=isend sbatch run_tau.sh                  # profile a different comm. variant
-TRACE=1 sbatch run_tau.sh                       # also write an OTF2 event trace
+TRACE=1 sbatch run_tau.sh                       # also write an OTF2 trace + a Perfetto/Chrome JSON trace
 sbatch -p PPAC_MI300A_SPX --gpus=4 --ntasks=4 run_tau.sh   # override partition/GPU count
 ```
+
+### Perfetto / `chrome://tracing` timeline (`TRACE=1`)
+
+With `TRACE=1`, `run_tau.sh` merges the per-rank raw traces (`tau_treemerge.pl`) and converts the merged trace with
+`tau_trace2json ... -chrome` into `$EXPDIR/perfetto_<method>.json` — a standard Chrome Trace Event JSON file. Open
+it at [ui.perfetto.dev](https://ui.perfetto.dev) (drag-and-drop the file) or `chrome://tracing` to see every
+MPI call, ROCm/HSA runtime call, and GPU kernel launch as a timeline per rank/thread, with flow arrows (`s`/`f`
+events) connecting each `MPI_Isend` to its matching `MPI_Irecv` — this is the easiest way to *see* overlap (or
+the lack of it) between communication and compute, rather than reading it out of aggregate call counts.
+
+> **Not valid strict JSON — by design.** The file is a bare `[ {...}, {...}, ... ,` with no closing `]` and a
+> trailing comma; this is the documented legacy Chrome Trace Event Format convention (any trace tooling can crash
+> mid-write and still leave a loadable file), and both Perfetto UI and `chrome://tracing` handle it natively. A
+> strict `json.load()` will reject it — that's expected, not corruption.
+>
+> **These traces are large.** A 4-rank, ~170-iteration run produces a ~400 MB JSON (~2.9M events after
+> `MPI_Init`, `hsa_*` runtime calls, and per-iteration kernels are all captured). Perfetto UI can still load it,
+> but expect it to take a while; for a smaller trace, target fewer iterations/ranks or a smaller matrix.
 
 Verified on AAC6/MI300A (ROCm 6.4.3, `tau/dev`): the profile below shows real per-call MPI time (`MPI_Init`, `MPI_Allreduce`, …) merged with ROCm HSA runtime and kernel time (`rocsparse::gthr_kernel`, `rocblas_dot_kernel_*`, …) in one `pprof` summary:
 

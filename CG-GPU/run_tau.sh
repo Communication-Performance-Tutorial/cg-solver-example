@@ -18,7 +18,9 @@
 #
 # Submit:
 #   sbatch run_tau.sh                    # profile only (pprof text summary)
-#   TRACE=1 sbatch run_tau.sh             # also collect an OTF2 event trace
+#   TRACE=1 sbatch run_tau.sh             # also collect an OTF2 trace + a
+#                                         # Perfetto/Chrome JSON trace (open at
+#                                         # https://ui.perfetto.dev)
 #   METHOD=isend sbatch run_tau.sh        # profile a different comm. variant
 #
 # Override the partition / GPU count on the command line, e.g.:
@@ -105,14 +107,20 @@ fi
 
 if [ "${TRACE:-0}" = "1" ]; then
     echo
-    echo "=== Merging TAU trace -> OTF2 ($EXPDIR) ==="
+    echo "=== Merging TAU trace -> OTF2 + Perfetto/Chrome JSON ($EXPDIR) ==="
     if ls "$EXPDIR"/tautrace.*.trc >/dev/null 2>&1; then
-        # Unlike pprof, tau_treemerge.pl/tau2otf2 do NOT honor $TRACEDIR to
-        # locate input files -- they glob tautrace.*.trc/events.*.edf in the
-        # current directory, so cd into $EXPDIR (no PROFILEDIR-style trap
-        # here: these tools don't consult $PROFILEDIR/$TRACEDIR at all).
-        ( cd "$EXPDIR" && tau_treemerge.pl && tau2otf2 tau.trc tau.edf "otf2_${METHOD}" ) \
-            || echo "WARN: OTF2 conversion failed"
+        # Unlike pprof, tau_treemerge.pl/tau2otf2/tau_trace2json do NOT honor
+        # $TRACEDIR to locate input files -- they glob tautrace.*.trc /
+        # events.*.edf in the current directory, so cd into $EXPDIR (no
+        # PROFILEDIR-style trap here: these tools don't consult
+        # $PROFILEDIR/$TRACEDIR at all). tau_treemerge.pl produces the merged
+        # tau.trc/tau.edf that both downstream converters read.
+        (
+            cd "$EXPDIR" \
+            && tau_treemerge.pl \
+            && tau2otf2 tau.trc tau.edf "otf2_${METHOD}" \
+            && tau_trace2json tau.trc tau.edf -chrome -o "perfetto_${METHOD}.json"
+        ) || echo "WARN: OTF2/Perfetto conversion failed"
     else
         echo "WARN: no tautrace.*.trc files in $EXPDIR -- trace not written"
     fi
@@ -120,10 +128,13 @@ fi
 
 echo
 echo "=== Artifacts ==="
-echo "  $PWD/$EXPDIR/profile.*        -- pprof (above) or paraprof (GUI: per-call bar"
-echo "                                   charts + communication matrix, needs a JRE)"
-[ "${TRACE:-0}" = "1" ] && \
-echo "  $PWD/$EXPDIR/otf2_${METHOD}/  -- OTF2 event trace, open in a trace viewer"
+echo "  $PWD/$EXPDIR/profile.*              -- pprof (above) or paraprof (GUI: per-call"
+echo "                                         bar charts + comm. matrix, needs a JRE)"
+if [ "${TRACE:-0}" = "1" ]; then
+echo "  $PWD/$EXPDIR/otf2_${METHOD}/        -- OTF2 event trace, open in a trace viewer"
+echo "  $PWD/$EXPDIR/perfetto_${METHOD}.json -- Chrome/Perfetto trace, open at"
+echo "                                         https://ui.perfetto.dev (or chrome://tracing)"
+fi
 
 date
 exit $STATUS
