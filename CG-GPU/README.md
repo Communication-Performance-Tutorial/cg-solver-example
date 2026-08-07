@@ -202,10 +202,8 @@ ROCm gives it two mechanisms to do that:
 
 | Mechanism | `HSA_ENABLE_SDMA` | How it works |
 |---|---|---|
-| **SDMA engines** | `1` (default) | Dedicated hardware DMA controllers transfer data between GPU memory and the fabric.
-They run independently of the shader engines and do not consume compute resources. |
-| **Blit kernels** | `0` | ROCm dispatches a small compute shader (a "blit") to copy the data using the GPU's shader engines.
-No dedicated DMA hardware is used. |
+| **SDMA engines** | `1` (default) | Dedicated hardware DMA controllers transfer data between GPU memory and the fabric. They run independently of the shader engines and do not consume compute resources. |
+| **Blit kernels** | `0` | ROCm dispatches a small compute shader (a "blit") to copy the data using the GPU's shader engines. No dedicated DMA hardware is used. |
 
 Set the variable before `mpirun` to switch between them:
 
@@ -238,8 +236,61 @@ The right choice is workload- and hardware-dependent; the sweep in `run_test_7.1
 
 ---
 
+## Profiling with TAU
+
+TAU intercepts MPI and, with `-rocm`, ROCm/HIP GPU calls via `LD_PRELOAD` — this directly measures the **communication** that GPU-only tools (rocprofv3, roofline, etc.) don't see: per-call MPI time, the per-rank point-to-point **communication matrix**, and (with `-rocm`) the ROCm runtime/kernel time in the same profile. No special instrumented build is needed — `tau_exec` wraps the plain `./cg_gpu` binary at run time.
+
+```bash
+module load rocm/6.4.3
+module load openmpi/5.0.10-ucc1.6.0-ucx1.19.1-xpmem-2.7.4
+module load tau/dev      # layered on top of rocm — load it last
+
+make
+mpirun -n 4 --bind-to none bash set_affinity_mi300a.sh \
+    tau_exec -T MPI,ROCM -rocm ./cg_gpu src/Dubcova2.pm rccl
+
+pprof            # text summary: per-call MPI + ROCm/HSA time, merged across ranks
+```
+
+`run_tau.sh` automates this end-to-end as an `sbatch` job (build → run under
+`tau_exec` → `pprof` summary), since the login node has no GPU:
+
+```bash
+sbatch run_tau.sh                              # profile 4 ranks, method=rccl
+METHOD=isend sbatch run_tau.sh                  # profile a different comm. variant
+TRACE=1 sbatch run_tau.sh                       # also write an OTF2 event trace
+sbatch -p PPAC_MI300A_SPX --gpus=4 --ntasks=4 run_tau.sh   # override partition/GPU count
+```
+
+Verified on AAC6/MI300A (ROCm 6.4.3, `tau/dev`): the profile below shows real per-call MPI time (`MPI_Init`, `MPI_Allreduce`, …) merged with ROCm HSA runtime and kernel time (`rocsparse::gthr_kernel`, `rocblas_dot_kernel_*`, …) in one `pprof` summary:
+
+```
+%Time    Exclusive    Inclusive       #Call      #Subrs  Inclusive Name
+100.0           34        8,976           1           1    8976004 .TAU application
+ 67.3        6,038        6,038           1           0    6038301 MPI_Init()
+  0.2            7           20         306         306         69 MPI_Allreduce()
+  0.0       0.0688       0.0688       25.05           0          3 [ROCm Kernel] rocsparse::gthr_kernel<...>
+```
+
+> **Known teardown quirk (ROCm 6.4.3 + `tau/dev`).** The instrumented run reliably
+> prints the CG solve result and writes every `profile.*` file, then the *process
+> teardown* aborts with `corrupted size vs. prev_size in fastbins` (a rocprofsdk +
+> glibc interaction, not a measurement failure) — `run_tau.sh` reads the profile
+> anyway and does not treat that nonzero exit as a hard failure.
+>
+> **`pprof`/`paraprof` read `$PROFILEDIR` themselves.** Run them from `CG-GPU/`
+> with `PROFILEDIR` set to the experiment dir — *don't* `cd` into that directory
+> first, or they'll look for a nonexistent nested `<dir>/<dir>/profile.*`.
+> `tau_treemerge.pl`/`tau2otf2` (used for `TRACE=1`) are the opposite: they don't
+> consult `$TRACEDIR` at all and must be run from inside the experiment directory.
+
+For the GUI (`paraprof`, per-call bar charts + the communication matrix), or to convert a `TRACE=1` run to OTF2 and view it in a trace viewer, open a remote graphical session (`man aac6_vnc` / `man aac6_novnc` / `man aac6_x11`) — `paraprof` needs a JRE, which may not be installed on every login node.
+
+---
+
 ## Requirements
 
 - ROCm ≥ 6.3 (rocSPARSE, rocBLAS, hipcc)
 - GPU-Aware MPI (OpenMPI/UCX built with ROCm support — see module list on
   the login banner)
+- TAU (`module load tau/dev`, loaded after `rocm`) for MPI+ROCm profiling/tracing
