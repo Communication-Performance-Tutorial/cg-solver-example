@@ -5,21 +5,29 @@
 #SBATCH --cpus-per-task=4
 #SBATCH --gres=gpu:8
 #SBATCH --time=00:10:00
-#SBATCH --output=/shared/prerelease/home/amd_int/slockhar/CommTutorial/CG-Tutorial/CG-GPU/cg_6.4.3_test_%j.log
+#SBATCH --output=cg_6.4.3_test_%j.log
 
 source /etc/profile 2>/dev/null
 source ~/.bashrc 2>/dev/null
 module load rocm/6.4.3 openmpi/5.0.10-ucc1.6.0-ucx1.19.1-xpmem-2.7.4
 
-cd /shared/prerelease/home/amd_int/slockhar/CommTutorial/CG-Tutorial/CG-GPU
+# SLURM copies the batch script to a spool dir; resolve CG-GPU/ from where
+# sbatch was invoked (submit from inside CG-GPU/).
+cd "${SLURM_SUBMIT_DIR:-$PWD}" || { echo "FAIL: cannot cd to submit dir"; exit 1; }
 
 make clean && make
 
 # --bind-to none: let set_affinity_mi300a.sh own all CPU and GPU pinning.
 # The affinity script sets ROCR_VISIBLE_DEVICES=local_rank (one GPU per rank)
 # and pins each rank to the CPU cores sharing the same memory domain.
-AFFINITY="/shared/prerelease/home/amd_int/slockhar/CommTutorial/CG-Tutorial/CG-GPU/set_affinity_mi300a.sh"
-MPIRUN="mpirun -n 8 --bind-to none bash ${AFFINITY}"
+# One rank == one GPU, so size everything off however many tasks/GPUs SLURM
+# actually granted this job (allows overriding --ntasks/--gres on the sbatch
+# command line to fit whatever node is available, not just an 8-GPU node).
+NUM_RANKS=${SLURM_NTASKS:-8}
+export NUM_GPUS=${NUM_RANKS}
+export NUM_CPUS=$(( NUM_RANKS * ${SLURM_CPUS_PER_TASK:-4} ))
+AFFINITY="./set_affinity_mi300a.sh"
+MPIRUN="mpirun -n ${NUM_RANKS} --bind-to none bash ${AFFINITY}"
 
 # Non-GPU-aware methods: no dependency on the SDMA vs blit-kernel path
 for m in staged alltoallv_staged rccl; do
