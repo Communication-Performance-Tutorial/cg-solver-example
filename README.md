@@ -35,12 +35,15 @@ Each iteration needs a distributed sparse matrix–vector product (SpMV), which 
 ```bash
 # CPU reference
 cd CG-CPU
+salloc -N 1 --ntasks=4 --gpus-per-task=1 -p SH5_MI300A_CPX
+module load rocm/6.4.1
 module load openmpi/5.0.10-ucc1.6.0-ucx1.19.1-xpmem-2.7.4
 make
 mpirun -n 4 ./cg_cpu src/Dubcova2.pm
 
 # GPU solver
 cd ../CG-GPU
+salloc -N 1 --ntasks=4 --gpus-per-task=1 -p SH5_MI300A_CPX
 module load rocm/6.4.1
 module load openmpi/5.0.10-ucc1.6.0-ucx1.19.1-xpmem-2.7.4
 make

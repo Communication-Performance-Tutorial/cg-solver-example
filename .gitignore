@@ -74,3 +74,7 @@ cg_tau*
 # large test matrices (too big for git; generate/download locally instead)
 thermal2.pm
 thermal2.mtx
+
+# binaries
+cg_cpu
+cg_gpu
