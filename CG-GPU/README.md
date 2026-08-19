@@ -65,11 +65,13 @@ make
 Pass the matrix file as the first argument and the communication method as the second (default: `staged`):
 
 ```bash
+salloc -N 1 --ntasks=4 --gpus-per-task=1 -p SH5_MI300A_CPX
 mpirun -n 4 ./cg_gpu src/Dubcova2.pm staged            # (default) Isend/Irecv through CPU host buffers
 mpirun -n 4 ./cg_gpu src/Dubcova2.pm isend             # Isend/Irecv with GPU buffers (GPU-Aware)
 mpirun -n 4 ./cg_gpu src/Dubcova2.pm rccl              # RCCL ncclSend/ncclRecv
 mpirun -n 4 ./cg_gpu src/Dubcova2.pm alltoallv_staged  # MPI_Alltoallv through CPU host buffers
 mpirun -n 4 ./cg_gpu src/Dubcova2.pm alltoallv         # MPI_Alltoallv with GPU buffers (GPU-Aware)
+exit
 ```
 
 All five methods produce the same numerical result (the CG algorithm is identical; only the spmv data exchange differs).
