@@ -47,7 +47,9 @@ make
 ## How to run
 
 ```bash
+salloc -N 1 --ntasks=4 --gpus-per-task=1 -p SH5_MI300A_CPX
 mpirun -n 4 ./cg_cpu src/Dubcova2.pm
+exit
 ```
 
 Expected output:
