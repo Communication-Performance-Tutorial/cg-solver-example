@@ -18,7 +18,7 @@ cd "${SLURM_SUBMIT_DIR:-$PWD}" || { echo "FAIL: cannot cd to submit dir"; exit 1
 make clean && make
 
 # --bind-to none: let set_affinity_mi300a.sh own all CPU and GPU pinning.
-# The affinity script sets ROCR_VISIBLE_DEVICES=local_rank (one GPU per rank)
+# The affinity script sets HIP_VISIBLE_DEVICES=local_rank (one GPU per rank)
 # and pins each rank to the CPU cores sharing the same memory domain.
 # One rank == one GPU, so size everything off however many tasks/GPUs SLURM
 # actually granted this job (allows overriding --ntasks/--gres on the sbatch

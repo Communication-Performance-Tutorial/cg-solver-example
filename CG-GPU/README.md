@@ -98,7 +98,7 @@ hipSetDevice(rank % num_gpus);
 ```
 
 On a node with 4 MPI ranks and multiple visible GPUs, each rank gets a distinct GPU.  To control which physical GPUs are used, set
-`ROCR_VISIBLE_DEVICES` before launching, or use a GPU affinity script with `mpirun --map-by NUMA`.  See the [Affinity part 2 blog post](https://rocm.blogs.amd.com/software-tools-optimization/affinity/part-2/README.html)
+`HIP_VISIBLE_DEVICES` before launching, or use a GPU affinity script with `mpirun --map-by NUMA`.  See the [Affinity part 2 blog post](https://rocm.blogs.amd.com/software-tools-optimization/affinity/part-2/README.html)
 for guidance on matching MPI ranks to GPU NUMA domains.
 
 ---

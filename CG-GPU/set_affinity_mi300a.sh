@@ -5,7 +5,7 @@
 # Usage (as mpirun per-rank launcher):
 #   mpirun -n 8 --bind-to none bash set_affinity_mi300a.sh <program> [args...]
 #
-# Each MPI rank is assigned exactly one GPU via ROCR_VISIBLE_DEVICES and is
+# Each MPI rank is assigned exactly one GPU via HIP_VISIBLE_DEVICES and is
 # pinned to the CPU cores that share the same memory domain as that GPU.
 # Limiting each rank to a single visible GPU also simplifies GPU assignment
 # inside the application: hipGetDeviceCount() returns 1, so hipSetDevice(0)
@@ -42,12 +42,12 @@ cpu_end=$(( cpu_start + CORES_PER_GPU - 1 ))
 # Give this rank exclusive visibility into its one GPU.
 # The application's hipGetDeviceCount() will return 1 and hipSetDevice(0)
 # will select the correct physical device.
-export ROCR_VISIBLE_DEVICES=${my_gpu}
+export HIP_VISIBLE_DEVICES=${my_gpu}
 
 # Pin to the target CPU core range if it lies within the SLURM cpuset.
 # On shared (non-exclusive) allocations SLURM may restrict the cpuset;
 # taskset fails with EINVAL if any requested core is absent.  Falling back
-# without CPU pinning is safe: ROCR_VISIBLE_DEVICES already routes each rank
+# without CPU pinning is safe: HIP_VISIBLE_DEVICES already routes each rank
 # to the correct GPU, and CPU placement does not affect GPU-to-GPU bandwidth.
 if taskset -c ${cpu_start}-${cpu_end} true 2>/dev/null; then
     exec taskset -c ${cpu_start}-${cpu_end} "$@"
