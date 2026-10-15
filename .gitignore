@@ -76,5 +76,5 @@ thermal2.pm
 thermal2.mtx
 
 # binaries
-cg_cpu
-cg_gpu
+CG-CPU/cg_cpu
+CG-GPU/cg_gpu

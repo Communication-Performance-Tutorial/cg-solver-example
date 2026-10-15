@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=cg_gpu_tau
-#SBATCH --partition=PPAC_MI300A_CPX
+#SBATCH --partition=SH5_MI300A_CPX
 #SBATCH --exclusive
 #SBATCH --gpus=4
 #SBATCH --ntasks=4
@@ -78,11 +78,13 @@ mkdir -p "$EXPDIR"
 # ---------------------------------------------------------------------------
 export PROFILEDIR="$EXPDIR"
 export TAU_COMM_MATRIX=1
+export TAU_TRACE=1
 if [ "${TRACE:-0}" = "1" ]; then
     export TAU_TRACE=1
+    export TAU_TRACE_FORMAT=perfetto
     export TRACEDIR="$EXPDIR"
 else
-    unset TAU_TRACE TRACEDIR
+    unset TAU_TRACE TAU_TRACE_FORMAT TRACEDIR
 fi
 
 echo "=== Running: method=$METHOD ranks=$NUM_RANKS matrix=$MATRIX (TRACE=${TRACE:-0}) ==="
