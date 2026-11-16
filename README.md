@@ -35,7 +35,7 @@ Each iteration needs a distributed sparse matrix–vector product (SpMV), which 
 ```bash
 # CPU reference
 cd CG-CPU
-salloc -N 1 --ntasks=4
+salloc -N 1 -c 4 --ntasks=4
 module swap PrgEnv-cray/8.7.0 PrgEnv-amd-openmpi/openmpi-5.0.10-ofi-7.14.0
 make
 mpirun -n 4 ./cg_cpu src/Dubcova2.pm
@@ -43,7 +43,7 @@ exit
 
 # GPU solver
 cd ../CG-GPU
-salloc -N 1 --ntasks=4 --gpus-per-task=1 -p 192C4G1H_MI300A_RHEL9_A1_CPX
+salloc -N 1 -c 4 --ntasks=4 --gpus-per-task=1 -p 192C4G1H_MI300A_RHEL9_A1_CPX
 module swap PrgEnv-cray/8.7.0 PrgEnv-amd-openmpi/openmpi-5.0.10-ofi-7.14.0
 make
 mpirun -n 4 ./cg_gpu src/Dubcova2.pm rccl
