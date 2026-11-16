@@ -7,12 +7,7 @@
 
 source /etc/profile 2>/dev/null
 source ~/.bashrc 2>/dev/null
-module load rocm/6.4.3 openmpi/5.0.10-ucc1.6.0-ucx1.19.1-xpmem-2.7.4
 
-# SLURM copies the batch script to a spool dir; resolve CG-CPU/ from where
-# sbatch was invoked (submit from inside CG-CPU/).
-cd "${SLURM_SUBMIT_DIR:-$PWD}" || { echo "FAIL: cannot cd to submit dir"; exit 1; }
-
-make clean && make
+module swap PrgEnv-cray/8.7.0 PrgEnv-amd-openmpi/openmpi-5.0.10-ofi-7.14.0
 
 mpirun -n ${SLURM_NTASKS:-4} ./cg_cpu src/Dubcova2.pm

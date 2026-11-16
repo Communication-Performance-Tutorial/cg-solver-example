@@ -1,21 +1,16 @@
 #!/bin/bash
-#SBATCH --job-name=cg_gpu_6.4.3
+#SBATCH --job-name=cg_gpu
 #SBATCH --nodes=1
-#SBATCH --ntasks=8
+#SBATCH --ntasks=4
 #SBATCH --cpus-per-task=4
-#SBATCH --gres=gpu:8
+#SBATCH --gres=gpu:4
 #SBATCH --time=00:10:00
-#SBATCH --output=cg_6.4.3_test_%j.log
+#SBATCH --output=cg_test_%j.log
 
 source /etc/profile 2>/dev/null
 source ~/.bashrc 2>/dev/null
-module load rocm/6.4.3 openmpi/5.0.10-ucc1.6.0-ucx1.19.1-xpmem-2.7.4
 
-# SLURM copies the batch script to a spool dir; resolve CG-GPU/ from where
-# sbatch was invoked (submit from inside CG-GPU/).
-cd "${SLURM_SUBMIT_DIR:-$PWD}" || { echo "FAIL: cannot cd to submit dir"; exit 1; }
-
-make clean && make
+module swap PrgEnv-cray/8.7.0 PrgEnv-amd-openmpi/openmpi-5.0.10-ofi-7.14.0
 
 # --bind-to none: let set_affinity_mi300a.sh own all CPU and GPU pinning.
 # The affinity script sets HIP_VISIBLE_DEVICES=local_rank (one GPU per rank)

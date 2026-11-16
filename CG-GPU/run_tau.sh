@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --job-name=cg_gpu_tau
-#SBATCH --partition=SH5_MI300A_CPX
+#SBATCH --partition=192C4G1H_MI300A_RHEL9_A1_CPX
 #SBATCH --exclusive
 #SBATCH --gpus=4
 #SBATCH --ntasks=4
@@ -39,19 +39,12 @@ set -u
 date
 echo "Node(s): ${SLURM_JOB_NODELIST:-<none - running outside SLURM>}"
 
-# SLURM copies the batch script to a spool dir; resolve CG-GPU/ from where
-# sbatch was invoked (submit from inside CG-GPU/).
-cd "${SLURM_SUBMIT_DIR:-$PWD}" || { echo "FAIL: cannot cd to submit dir"; exit 1; }
-
 # ---------------------------------------------------------------------------
 # Modules: ROCm + GPU-Aware OpenMPI + TAU (TAU is layered on top of the rocm
 # module, so it must load after ROCm is on the module path).
 # ---------------------------------------------------------------------------
-module purge 2>/dev/null
-module load "${ROCM_MODULE:-rocm/6.4.3}"
-module load "${OPENMPI_MODULE:-openmpi/5.0.10-ucc1.6.0-ucx1.19.1-xpmem-2.7.4}" 2>/dev/null || module load openmpi
+module swap PrgEnv-cray/8.7.0 PrgEnv-amd-openmpi/openmpi-5.0.10-ofi-7.14.0
 module load tau/dev
-module list 2>&1
 
 command -v tau_exec >/dev/null || { echo "FAIL: tau_exec not on PATH"; exit 1; }
 echo "[info] $(tau_exec -help 2>&1 | head -1) | $(rocminfo 2>/dev/null | grep -m1 -o 'gfx[0-9a-f]*')"
@@ -59,10 +52,6 @@ echo "[info] $(tau_exec -help 2>&1 | head -1) | $(rocminfo 2>/dev/null | grep -m
 # ---------------------------------------------------------------------------
 # Build (plain build -- tau_exec instruments at run time, no recompile needed)
 # ---------------------------------------------------------------------------
-echo "=== Building cg_gpu ==="
-make clean && make || { echo "FAIL: build failed"; exit 1; }
-[ -x ./cg_gpu ] || { echo "FAIL: cg_gpu not produced"; exit 1; }
-
 METHOD=${METHOD:-rccl}
 MATRIX=${MATRIX:-src/Dubcova2.pm}
 NUM_RANKS=${SLURM_NTASKS:-4}
